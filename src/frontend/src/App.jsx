@@ -26,10 +26,8 @@ function App() {
   const styles = {
     parent: {
       display: "grid",
+      justifyItems: "center",
       width: "100%",
-    },
-    child: {
-      width: "50%",
     },
   };
 
@@ -38,14 +36,12 @@ function App() {
       <>
         <Header />
         <Box sx={styles.parent}>
-          <Box sx={styles.child}>
-            <SelectionPane
-              ttsText={ttsText}
-              setTtsText={setTtsText}
-              voices={voices}
-              setSelectedVoice={setSelectedVoice}
-            />
-          </Box>
+          <SelectionPane
+            ttsText={ttsText}
+            setTtsText={setTtsText}
+            voices={voices}
+            setSelectedVoice={setSelectedVoice}
+          />
         </Box>
       </>
     </ThemeProvider>
