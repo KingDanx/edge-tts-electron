@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("node:path");
+const fs = require("fs");
 const isDev = require("@kingdanx/electron-is-dev");
 const LiteLogger = require("@kingdanx/litelogger");
 const { spawn } = require("child_process");
@@ -13,6 +14,7 @@ const EDGE_TTS = path.join(
   "edge-tts.exe"
 );
 const PIP = path.join(__dirname, "binaries", "python", "Scripts", "pip.exe");
+const TEMP_PATH = path.join(__dirname, "temp");
 
 const logger = new LiteLogger(__dirname, "log", "logs", 14);
 
@@ -24,6 +26,14 @@ if (require("electron-squirrel-startup")) {
   app.quit();
 }
 
+process.on("uncaughtException", (error) => {
+  console.error("Unhandled Exception:", error);
+  dialog.showErrorBox(
+    "Unhandled Exception",
+    `An error occurred: ${error.message}`
+  );
+});
+
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -31,6 +41,7 @@ const createWindow = () => {
     height: 525,
     frame: false,
     webPreferences: {
+      webSecurity: false,
       preload: path.join(__dirname, "preload.js"),
     },
   });
@@ -54,25 +65,42 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  installEdgeTts()
-    .then((code) => {
-      console.log("install code:", code);
-
-      createWindow();
-      initListeners();
-      previewTts("uwajimaya", "ja-JP-KeitaNeural");
-
-      // On OS X it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
-      app.on("activate", () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
+app
+  .whenReady()
+  .then(() => {
+    purgeTemp();
+    installEdgeTts()
+      .then((code) => {
+        if (code == 0) {
           createWindow();
+          initListeners();
+
+          // On OS X it's common to re-create a window in the app when the
+          // dock icon is clicked and there are no other windows open.
+          app.on("activate", () => {
+            if (BrowserWindow.getAllWindows().length === 0) {
+              createWindow();
+            }
+          });
+        } else {
+          throw new Error(
+            "An error occured when uninstalling or installing edge-tts"
+          );
         }
+      })
+      .catch((e) => {
+        dialog.showErrorBox(
+          "Unhandled Exception",
+          `An error occurred: ${e?.message || e.toString()}`
+        );
       });
-    })
-    .catch((e) => console.error(e));
-});
+  })
+  .catch((e) => {
+    dialog.showErrorBox(
+      "Unhandled Exception",
+      `An error occurred: ${e?.message || e.toString()}`
+    );
+  });
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -88,10 +116,8 @@ app.on("window-all-closed", () => {
 function getVoices() {
   const python = spawn(EDGE_TTS, ["-l"]);
 
-  console.log(`"${EDGE_TTS}" -l`);
-
   python.on("error", (e) => {
-    console.log(e);
+    logger.error(`Get voices error: ${e.toString()}`);
     window.webContents.send("getVoices", {
       success: false,
       error: e.toString(),
@@ -99,7 +125,7 @@ function getVoices() {
   });
 
   python.stderr.on("data", (e) => {
-    console.log(e.toString());
+    logger.error(`Get voices error: ${e.toString()}`);
     window.webContents.send("getVoices", {
       success: false,
       error: e.toString(),
@@ -134,32 +160,36 @@ function getVoices() {
   });
 }
 
-function previewTts(text, voice = "en-US-BrianNeural") {
+function previewTts(event, { text, voiceId = "en-US-BrianNeural" }) {
   const filePath = path.join(__dirname, "temp", `temp${Date.now()}.mp3`);
   const python = spawn(EDGE_TTS, [
     "-t",
-    text,
+    `"${text.replaceAll('"', "''")}"`,
     "--voice",
-    voice,
+    voiceId,
     "--write-media",
     filePath,
   ]);
 
-  python.on("error", (e) =>
-    window.webContents.send("previewTts", {
-      success: false,
-      error: e.toString(),
-    })
-  );
+  python.on("error", (e) => {
+    if (!e.toString().includes("-->")) {
+      window.webContents.send("previewTts", {
+        success: false,
+        error: e.toString(),
+      });
+      logger.error(`Preview error: ${e.toString()}`);
+    }
+  });
 
-  python.stderr.on("data", (e) =>
-    window.webContents.send("previewTts", {
-      success: false,
-      error: e.toString(),
-    })
-  );
-
-  python.stdout.on("data", (d) => console.log(d.toString()));
+  python.stderr.on("data", (e) => {
+    if (!e.toString().includes("-->")) {
+      window.webContents.send("previewTts", {
+        success: false,
+        error: e.toString(),
+      });
+      logger.error(`Preview error: ${e.toString()}`);
+    }
+  });
 
   python.on("close", () => {
     window.webContents.send("previewTts", {
@@ -190,11 +220,10 @@ function installEdgeTts() {
     });
 
     uninstall.stdout.on("data", (d) => {
-      console.log(d.toString());
       if (d.toString().includes("Y/n")) {
         uninstall.stdin.write(Buffer.from("y\r\n"), (e) => {
           if (e) {
-            console.log("write error:", e.toString());
+            logger.error(`Write error: ${e.toString()}`);
           }
         });
       }
@@ -220,26 +249,38 @@ function installEdgeTts() {
       });
 
       install.stdout.on("data", (d) => {
-        console.log(d.toString());
         if (d.toString().includes("Y/n")) {
           install.stdin.write(Buffer.from("y\r\n"), (e) => {
             if (e) {
-              console.log("write error:", e.toString());
+              logger.error(`Write error: ${e.toString()}`);
             }
           });
         }
       });
 
       install.on("close", (code) => {
-        console.log(`Close Code Install: ${code}`);
         resolve(code);
       });
     });
   });
 }
 
+async function purgeTemp() {
+  try {
+    const files = await fs.promises.readdir(TEMP_PATH);
+
+    for (const file of files) {
+      const filePath = path.join(TEMP_PATH, file);
+      await fs.promises.unlink(filePath);
+    }
+  } catch (e) {
+    logger.error(`Purge temp error: ${e.toString()}`);
+  }
+}
+
 function initListeners() {
   ipcMain.on("getVoices", getVoices);
+  ipcMain.on("previewTts", previewTts);
   ipcMain.on("minimize-window", () => {
     window.minimize();
   });

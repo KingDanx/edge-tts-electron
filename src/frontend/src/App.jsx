@@ -44,6 +44,7 @@ function App() {
             setTtsText={setTtsText}
             voices={voices}
             setSelectedVoice={setSelectedVoice}
+            selectedVoice={selectedVoice}
           />
         </Box>
       </>

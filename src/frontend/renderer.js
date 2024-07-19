@@ -11,7 +11,23 @@ export const getVoices = () => {
 
     ipcRenderer.once("getVoices", (response) => {
       try {
-        console.log(response)
+        console.log(response);
+        resolve(response);
+      } catch (e) {
+        console.log(e);
+        reject(e);
+      }
+    });
+  });
+};
+
+export const previewTts = (text, voiceId) => {
+  return new Promise((resolve, reject) => {
+    ipcRenderer.send("previewTts", { text, voiceId });
+
+    ipcRenderer.once("previewTts", (response) => {
+      try {
+        console.log(response);
         resolve(response);
       } catch (e) {
         console.log(e);
