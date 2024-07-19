@@ -5,18 +5,16 @@ const isDev = require("@kingdanx/electron-is-dev");
 const LiteLogger = require("@kingdanx/litelogger");
 const { spawn } = require("child_process");
 
-const PYTHON = path.join(__dirname, "binaries", "python", "python.exe");
-const EDGE_TTS = path.join(
-  __dirname,
-  "binaries",
-  "python",
-  "Scripts",
-  "edge-tts.exe"
+const PYTHON = getResourcePath(path.join("binaries", "python", "python.exe"));
+const EDGE_TTS = getResourcePath(
+  path.join("binaries", "python", "Scripts", "edge-tts.exe")
 );
-const PIP = path.join(__dirname, "binaries", "python", "Scripts", "pip.exe");
-const TEMP_PATH = path.join(__dirname, "temp");
+const PIP = getResourcePath(
+  path.join("binaries", "python", "Scripts", "pip.exe")
+);
+const TEMP_PATH = getResourcePath(path.join("temp"));
 
-const logger = new LiteLogger(__dirname, "log", "logs", 14);
+const logger = new LiteLogger(getResourcePath(), "log", "logs", 14);
 
 let window;
 let voices = [];
@@ -53,7 +51,7 @@ const createWindow = () => {
   if (isDev) {
     mainWindow.loadURL("http://localhost:5173");
   } else {
-    mainWindow.loadFile(path.join(__dirname, "index.html"));
+    mainWindow.loadFile("src/frontend/dist/index.html");
   }
 
   // Open the DevTools.
@@ -113,6 +111,21 @@ app.on("window-all-closed", () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+function getResourcePath(resourceRelativePath = null) {
+  if (isDev) {
+    if (resourceRelativePath) {
+      return path.join(__dirname, resourceRelativePath);
+    } else {
+      return __dirname;
+    }
+  }
+  if (resourceRelativePath) {
+    return path.join(process.resourcesPath, resourceRelativePath);
+  } else {
+    return process.resourcesPath;
+  }
+}
+
 function getVoices() {
   const python = spawn(EDGE_TTS, ["-l"]);
 
@@ -161,7 +174,7 @@ function getVoices() {
 }
 
 function previewTts(event, { text, voiceId = "en-US-BrianNeural" }) {
-  const filePath = path.join(__dirname, "temp", `temp${Date.now()}.mp3`);
+  const filePath = getResourcePath(path.join("temp", `temp${Date.now()}.mp3`));
   const python = spawn(EDGE_TTS, [
     "-t",
     `"${text.replaceAll('"', "''")}"`,
