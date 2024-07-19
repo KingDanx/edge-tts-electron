@@ -14,6 +14,8 @@ const SelectionPane = ({ ttsText, setTtsText, voices, setSelectedVoice }) => {
     setTtsText(e.target.value);
   };
 
+  console.log(voices);
+
   const handleVoiceChange = (e, n, action) => {
     if (action === "clear") {
       setSelectedVoice({});
@@ -31,15 +33,17 @@ const SelectionPane = ({ ttsText, setTtsText, voices, setSelectedVoice }) => {
     setIsLoading(true);
   };
 
-  const options = voices
-    .map((voice) => {
-      const language = voice.language;
-      return {
-        language: /[0-9]/.test(language) ? "0-9" : language,
-        ...voice,
-      };
-    })
-    .sort((a, b) => -b.name.localeCompare(a.name));
+  const options = Array.isArray(voices)
+    ? voices
+        .map((voice) => {
+          const language = voice.language;
+          return {
+            language: /[0-9]/.test(language) ? "0-9" : language,
+            ...voice,
+          };
+        })
+        .sort((a, b) => -b.name.localeCompare(a.name))
+    : [];
 
   const styles = {
     textField: {
@@ -79,7 +83,6 @@ const SelectionPane = ({ ttsText, setTtsText, voices, setSelectedVoice }) => {
         value={ttsText}
         multiline
         variant="filled"
-        maxRows={10}
         rows={10}
       />
       <Box sx={styles.buttonBox}>
@@ -99,7 +102,7 @@ const SelectionPane = ({ ttsText, setTtsText, voices, setSelectedVoice }) => {
           {isSaving ? "Saving" : "Save"}
         </Button>
       </Box>
-      <Grow in={audioSrc}>
+      <Grow in={audioSrc !== ""}>
         <Box sx={styles.audioBox}>
           <audio controls src={audioSrc}></audio>
         </Box>

@@ -20,7 +20,10 @@ function App() {
   useEffect(() => {
     getVoices()
       .then((d) => setVoices(d.data))
-      .catch((e) => console.log(e));
+      .catch((e) => {
+        setVoices([]);
+        console.log(e);
+      });
   }, []);
 
   const styles = {
