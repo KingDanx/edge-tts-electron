@@ -12,6 +12,7 @@ const EDGE_TTS = getResourcePath(
 const PIP = getResourcePath(
   path.join("binaries", "python", "Scripts", "pip.exe")
 );
+const GET_PIP = getResourcePath(path.join("binaries", "python", "get-pip.py"));
 const TEMP_PATH = getResourcePath(path.join("temp"));
 
 const logger = new LiteLogger(getResourcePath(), "log", "logs", 14);
@@ -65,8 +66,13 @@ const createWindow = () => {
 // Some APIs can only be used after this event occurs.
 app
   .whenReady()
-  .then(() => {
+  .then(async () => {
     purgeTemp();
+    try {
+      await installPip();
+    } catch (e) {
+      console.error(e);
+    }
     installEdgeTts()
       .then((code) => {
         if (code == 0) {
@@ -208,6 +214,31 @@ function previewTts(event, { text, voiceId = "en-US-BrianNeural" }) {
     window.webContents.send("previewTts", {
       success: true,
       data: filePath,
+    });
+  });
+}
+
+function installPip() {
+  return new Promise((resolve, reject) => {
+    const install = spawn(PYTHON, [GET_PIP]);
+
+    install.on("error", (e) => {
+      logger.error(e.toString());
+      reject(e.toString());
+    });
+
+    install.stderr.on("data", (e) => {
+      logger.error(`PIP install error: ${e.toString()}`);
+      console.log(e.toString());
+    });
+
+    install.stdout.on("data", (d) => {
+      console.log("std out:", d.toString());
+    });
+
+    install.on("close", (code) => {
+      console.log(code, "code");
+      resolve();
     });
   });
 }
