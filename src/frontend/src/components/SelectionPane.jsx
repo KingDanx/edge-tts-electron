@@ -7,6 +7,10 @@ import Grow from "@mui/material/Grow";
 import Tooltip from "@mui/material/Tooltip";
 import { previewTts } from "../../renderer";
 
+function isUpperCase(char) {
+  return char === char.toUpperCase() && char !== char.toLowerCase();
+}
+
 const SelectionPane = ({
   ttsText,
   setTtsText,
@@ -85,9 +89,29 @@ const SelectionPane = ({
   const options = Array.isArray(voices)
     ? voices
         .map((voice) => {
-          const language = voice.language;
+          const [language, , name] = voice.ShortName.split("-");
+
+          const chars = name.split("");
+          const newName = [];
+
+          for (let i = 0; i < chars.length; i++) {
+            const letter = chars[i];
+            if (i === 0) {
+              newName.push(letter);
+              continue;
+            }
+            if (isUpperCase(letter)) {
+              newName.push(" ");
+              newName.push(letter);
+            } else {
+              newName.push(letter);
+            }
+          }
+
           return {
-            language: /[0-9]/.test(language) ? "0-9" : language,
+            language: /[0-9]/.test(language) ? "0-9" : language.toUpperCase(),
+            name: newName.join(""),
+            voiceId: voice.ShortName,
             ...voice,
           };
         })

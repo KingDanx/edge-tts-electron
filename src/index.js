@@ -1,18 +1,14 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
-const path = require("node:path");
-const fs = require("fs");
-const isDev = require("@kingdanx/electron-is-dev");
-const LiteLogger = require("@kingdanx/litelogger");
-const { spawn } = require("child_process");
+import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import path from "node:path";
+import fs from "fs";
+import isDev from "electron-is-dev";
+import LiteLogger from "@kingdanx/litelogger";
+import { spawn } from "child_process";
+import install from "electron-squirrel-startup";
+import EdgeTTS from "@kingdanx/edge-tts-js";
 
-const PYTHON = getResourcePath(path.join("binaries", "python", "python.exe"));
-const EDGE_TTS = getResourcePath(
-  path.join("binaries", "python", "Scripts", "edge-tts.exe")
-);
-const PIP = getResourcePath(
-  path.join("binaries", "python", "Scripts", "pip.exe")
-);
-const GET_PIP = getResourcePath(path.join("binaries", "python", "get-pip.py"));
+const __dirname = import.meta.dirname;
+
 const TEMP_PATH = getResourcePath(path.join("temp"));
 
 const logger = new LiteLogger(getResourcePath(), "log", "logs", 14);
@@ -21,7 +17,7 @@ let window;
 let voices = [];
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require("electron-squirrel-startup")) {
+if (install) {
   app.quit();
 }
 
@@ -67,37 +63,22 @@ const createWindow = () => {
 app
   .whenReady()
   .then(async () => {
-    purgeTemp();
     try {
-      await installPip();
+      purgeTemp();
+      voices = await EdgeTTS.getVoices();
+      createWindow();
+      initListeners();
+
+      // On OS X it's common to re-create a window in the app when the
+      // dock icon is clicked and there are no other windows open.
+      app.on("activate", () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+          createWindow();
+        }
+      });
     } catch (e) {
       console.error(e);
     }
-    installEdgeTts()
-      .then((code) => {
-        if (code == 0) {
-          createWindow();
-          initListeners();
-
-          // On OS X it's common to re-create a window in the app when the
-          // dock icon is clicked and there are no other windows open.
-          app.on("activate", () => {
-            if (BrowserWindow.getAllWindows().length === 0) {
-              createWindow();
-            }
-          });
-        } else {
-          throw new Error(
-            "An error occured when uninstalling or installing edge-tts"
-          );
-        }
-      })
-      .catch((e) => {
-        dialog.showErrorBox(
-          "Unhandled Exception",
-          `An error occurred: ${e?.message || e.toString()}`
-        );
-      });
   })
   .catch((e) => {
     dialog.showErrorBox(
@@ -133,180 +114,33 @@ function getResourcePath(resourceRelativePath = null) {
 }
 
 function getVoices() {
-  const python = spawn(EDGE_TTS, ["-l"]);
-
-  python.on("error", (e) => {
-    logger.error(`Get voices error: ${e.toString()}`);
-    window.webContents.send("getVoices", {
-      success: false,
-      error: e.toString(),
-    });
-  });
-
-  python.stderr.on("data", (e) => {
-    logger.error(`Get voices error: ${e.toString()}`);
-    window.webContents.send("getVoices", {
-      success: false,
-      error: e.toString(),
-    });
-  });
-
-  python.stdout.on("data", (d) => {
-    const strData = d.toString();
-
-    const splitData = strData.split("\r\n");
-
-    const data = splitData
-      .filter((voice) => voice.includes("Name"))
-      .map((voice) => {
-        const v = voice.replace("Name: ", "");
-        return {
-          voiceId: v,
-          language: v.slice(0, 2).replace("-", "").toUpperCase(),
-          accent: v.slice(3, 5).replace("-", ""),
-          name: v.slice(6).replace("Neural", "").replace("-", ""),
-        };
-      });
-
-    voices = data;
-
-    window.webContents.send("getVoices", {
-      success: true,
-      data: voices,
-    });
-
-    python.kill(0);
+  window.webContents.send("getVoices", {
+    success: true,
+    data: voices,
   });
 }
 
-function previewTts(event, { text, voiceId = "en-US-BrianNeural" }) {
-  const filePath = getResourcePath(path.join("temp", `temp${Date.now()}.mp3`));
-  const python = spawn(EDGE_TTS, [
-    "-t",
-    `"${text.replaceAll('"', "''")}"`,
-    "--voice",
-    voiceId,
-    "--write-media",
-    filePath,
-  ]);
+async function previewTts(event, { text, voiceId = "en-US-BrianNeural" }) {
+  const filePath = getResourcePath(path.join("temp"));
 
-  python.on("error", (e) => {
-    if (!e.toString().includes("-->")) {
-      window.webContents.send("previewTts", {
-        success: false,
-        error: e.toString(),
-      });
-      logger.error(`Preview error: ${e.toString()}`);
-    }
-  });
+  try {
+    const tts = new EdgeTTS({
+      voice: voiceId,
+      text: text,
+    });
 
-  python.stderr.on("data", (e) => {
-    if (!e.toString().includes("-->")) {
-      window.webContents.send("previewTts", {
-        success: false,
-        error: e.toString(),
-      });
-      logger.error(`Preview error: ${e.toString()}`);
-    }
-  });
+    const file = await tts.ttsToFile(filePath);
 
-  python.on("close", () => {
     window.webContents.send("previewTts", {
       success: true,
-      data: filePath,
+      data: file,
     });
-  });
-}
-
-function installPip() {
-  return new Promise((resolve, reject) => {
-    const install = spawn(PYTHON, [GET_PIP]);
-
-    install.on("error", (e) => {
-      logger.error(e.toString());
-      reject(e.toString());
+  } catch (error) {
+    window.webContents.send("previewTts", {
+      success: false,
+      error: error.toString(),
     });
-
-    install.stderr.on("data", (e) => {
-      logger.error(`PIP install error: ${e.toString()}`);
-      console.log(e.toString());
-    });
-
-    install.stdout.on("data", (d) => {
-      console.log("std out:", d.toString());
-    });
-
-    install.on("close", (code) => {
-      console.log(code, "code");
-      resolve();
-    });
-  });
-}
-
-function installEdgeTts() {
-  return new Promise((resolve, reject) => {
-    const uninstall = spawn(PYTHON, [PIP, "uninstall", "edge-tts"]);
-
-    uninstall.on("error", (e) => {
-      logger.error(
-        `An unexpected error occured while uninstalling edge-tts: ${e.toString()}`
-      );
-      if (!e.toString().includes("PATH")) {
-        reject(e.toString());
-      }
-    });
-
-    uninstall.stderr.on("data", (e) => {
-      logger.error(`Uninstall error: ${e.toString()}`);
-      if (!e.toString().includes("PATH")) {
-        reject(e.toString());
-      }
-    });
-
-    uninstall.stdout.on("data", (d) => {
-      if (d.toString().includes("Y/n")) {
-        uninstall.stdin.write(Buffer.from("y\r\n"), (e) => {
-          if (e) {
-            logger.error(`Write error: ${e.toString()}`);
-          }
-        });
-      }
-    });
-
-    uninstall.on("close", () => {
-      const install = spawn(PYTHON, [PIP, "install", "edge-tts"]);
-
-      install.on("error", (e) => {
-        logger.error(
-          `An unexpected error occured while installing edge-tts: ${e.toString()}`
-        );
-        if (!e.toString().includes("PATH")) {
-          reject(e.toString());
-        }
-      });
-
-      install.stderr.on("data", (e) => {
-        logger.error(`Install error: ${e.toString()}`);
-        if (!e.toString().includes("PATH")) {
-          reject(e.toString());
-        }
-      });
-
-      install.stdout.on("data", (d) => {
-        if (d.toString().includes("Y/n")) {
-          install.stdin.write(Buffer.from("y\r\n"), (e) => {
-            if (e) {
-              logger.error(`Write error: ${e.toString()}`);
-            }
-          });
-        }
-      });
-
-      install.on("close", (code) => {
-        resolve(code);
-      });
-    });
-  });
+  }
 }
 
 async function purgeTemp() {

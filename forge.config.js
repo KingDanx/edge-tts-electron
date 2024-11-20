@@ -1,16 +1,11 @@
-const { FusesPlugin } = require("@electron-forge/plugin-fuses");
-const { FuseV1Options, FuseVersion } = require("@electron/fuses");
+import { FusesPlugin } from "@electron-forge/plugin-fuses";
+import { FuseV1Options, FuseVersion } from "@electron/fuses";
 
-module.exports = {
+export default {
   packagerConfig: {
     asar: true,
     icon: "./icon/icon.ico",
-    extraResource: [
-      "./src/logs",
-      "./src/temp",
-      "./src/binaries",
-      "./src/frontend/dist",
-    ],
+    extraResource: ["./src/logs", "./src/temp", "./src/frontend/dist"],
   },
   rebuildConfig: {},
   makers: [
@@ -18,7 +13,7 @@ module.exports = {
       name: "@electron-forge/maker-squirrel",
       config: {
         name: "dap-edge-tts", // This should be your application's machine-friendly name
-        authors: "Dan Prudhomme JR", // Replace with your details
+        authors: "DAP Comm", // Replace with your details
         description: "GUI for the edge-tts python library", // Provide a short description of your application
       },
     },
