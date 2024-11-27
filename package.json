@@ -1,7 +1,7 @@
 {
   "name": "edge-tts-electron",
   "productName": "DAP Edge TTS",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "My Electron application",
   "main": "src/index.js",
   "scripts": {
@@ -31,7 +31,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@kingdanx/edge-tts-js": "^1.0.6",
+    "@kingdanx/edge-tts-js": "^1.0.7",
     "@kingdanx/litelogger": "^1.1.0",
     "electron-forge": "^0.0.2",
     "electron-is-dev": "^3.0.1",

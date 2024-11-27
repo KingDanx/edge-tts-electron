@@ -3,15 +3,17 @@ import path from "node:path";
 import fs from "fs";
 import isDev from "electron-is-dev";
 import LiteLogger from "@kingdanx/litelogger";
-import { spawn } from "child_process";
 import install from "electron-squirrel-startup";
 import EdgeTTS from "@kingdanx/edge-tts-js";
+import { randomUUID } from "node:crypto";
 
 const __dirname = import.meta.dirname;
 
 const TEMP_PATH = getResourcePath(path.join("temp"));
 
 const logger = new LiteLogger(getResourcePath(), "log", "logs", 14);
+
+const tts = new EdgeTTS({});
 
 let window;
 let voices = [];
@@ -124,16 +126,19 @@ async function previewTts(event, { text, voiceId = "en-US-BrianNeural" }) {
   const filePath = getResourcePath(path.join("temp"));
 
   try {
-    const tts = new EdgeTTS({
-      voice: voiceId,
-      text: text,
-    });
+    tts.tts.setVoiceParams({ voice: voiceId, text: text });
 
     const file = await tts.ttsToFile(filePath);
 
+    const randomFileName = `${randomUUID()}${tts.tts.fileType.ext}`;
+
+    const newPath = path.join(filePath, randomFileName);
+
+    await fs.promises.rename(file, newPath);
+
     window.webContents.send("previewTts", {
       success: true,
-      data: file,
+      data: newPath,
     });
   } catch (error) {
     window.webContents.send("previewTts", {

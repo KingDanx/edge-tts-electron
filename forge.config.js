@@ -14,7 +14,7 @@ export default {
       config: {
         name: "dap-edge-tts", // This should be your application's machine-friendly name
         authors: "DAP Comm", // Replace with your details
-        description: "GUI for the edge-tts python library", // Provide a short description of your application
+        description: "GUI for the edge-tts-js library", // Provide a short description of your application
       },
     },
     {
