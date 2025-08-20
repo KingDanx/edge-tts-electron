@@ -1,7 +1,7 @@
 {
   "name": "edge-tts-electron",
   "productName": "DAP Edge TTS",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "My Electron application",
   "main": "src/index.js",
   "scripts": {
@@ -13,7 +13,7 @@
   },
   "type": "module",
   "devDependencies": {
-    "@electron-forge/cli": "^7.4.0",
+    "@electron-forge/cli": "^7.8.3",
     "@electron-forge/maker-deb": "^7.4.0",
     "@electron-forge/maker-rpm": "^7.4.0",
     "@electron-forge/maker-squirrel": "^7.4.0",
@@ -31,7 +31,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@kingdanx/edge-tts-js": "^1.0.7",
+    "@kingdanx/edge-tts-js": "^1.0.11",
     "@kingdanx/litelogger": "^1.1.0",
     "electron-forge": "^0.0.2",
     "electron-is-dev": "^3.0.1",

@@ -13,7 +13,7 @@ const TEMP_PATH = getResourcePath(path.join("temp"));
 
 const logger = new LiteLogger(getResourcePath(), "log", "logs", 14);
 
-const tts = new EdgeTTS({});
+const tts = new EdgeTTS();
 
 let window;
 let voices = [];
